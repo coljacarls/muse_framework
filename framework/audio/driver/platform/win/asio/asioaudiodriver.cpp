@@ -23,6 +23,8 @@
 
 #include "global/async/notification.h"
 
+#include <windows.h> // iasiodrv.h needs the COM `interface` keyword; non-unity builds don't get it transitively
+
 #undef UNICODE
 #include "common/asiosys.h"
 #include "common/asio.h"
