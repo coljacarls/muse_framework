@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -208,7 +209,12 @@ protected:
 
     void updateMainSequenceIterator()
     {
-        m_currentMainSequenceIt = m_mainStreamEvents.lower_bound(m_playbackPosition);
+        //! NOTE A seek position is converted via seconds and samples and may end up a few microseconds
+        //! after the timestamp of the events it targets (those are truncated to microseconds).
+        //! Include events slightly before the position, otherwise e.g. the first beat of a measure is skipped.
+        constexpr int64_t SEEK_TOLERANCE_US = 100;
+        const int64_t from = std::max<int64_t>(m_playbackPosition.raw() - SEEK_TOLERANCE_US, 0);
+        m_currentMainSequenceIt = m_mainStreamEvents.lower_bound(msecs_t(from));
     }
 
     void updateOffSequenceIterator()
