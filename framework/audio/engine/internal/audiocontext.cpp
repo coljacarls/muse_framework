@@ -113,8 +113,9 @@ void AudioContext::deinit()
 void AudioContext::onModeChanged(const ProcessMode mode)
 {
     ONLY_AUDIO_ENGINE_THREAD;
+    m_offStreamTracks.clear();
     if (mode == ProcessMode::Idle) {
-        m_mixer->setTracksToProcessWhenIdle(m_tracksToProcessWhenIdle);
+        updateTracksToProcessWhenIdle();
     }
 
     //! NOTE will be set on all nodes in the chain
@@ -185,16 +186,9 @@ RetVal2<TrackId, TrackParams> AudioContext::addTrack(const std::string& trackNam
     TrackId trackId = newTrackId();
 
     auto onOffStreamReceived = [this, trackId]() {
-        std::unordered_set<TrackId> tracksToProcess = m_tracksToProcessWhenIdle;
-
-        if (m_prevActiveTrackId == INVALID_TRACK_ID) {
-            tracksToProcess.insert(trackId);
-        } else {
-            tracksToProcess.insert({ m_prevActiveTrackId, trackId });
+        if (m_offStreamTracks.insert(trackId).second) {
+            updateTracksToProcessWhenIdle();
         }
-
-        m_mixer->setTracksToProcessWhenIdle(tracksToProcess);
-        m_prevActiveTrackId = trackId;
     };
 
     // Make source
@@ -400,10 +394,7 @@ void AudioContext::removeTrack(const TrackId trackId)
     m_mixer->removeTrack(trackId);
     m_tracks.erase(it);
     muse::remove(m_tracksToProcessWhenIdle, trackId);
-
-    if (m_prevActiveTrackId == trackId) {
-        m_prevActiveTrackId = INVALID_TRACK_ID;
-    }
+    muse::remove(m_offStreamTracks, trackId);
 
     m_trackRemoved.send(trackId);
 }
@@ -517,7 +508,15 @@ void AudioContext::onShouldProcessDuringSilenceChanged(const TrackId trackId, bo
         muse::remove(m_tracksToProcessWhenIdle, trackId);
     }
 
-    m_mixer->setTracksToProcessWhenIdle(m_tracksToProcessWhenIdle);
+    updateTracksToProcessWhenIdle();
+}
+
+void AudioContext::updateTracksToProcessWhenIdle()
+{
+    ONLY_AUDIO_ENGINE_THREAD;
+    std::unordered_set<TrackId> tracks = m_tracksToProcessWhenIdle;
+    tracks.insert(m_offStreamTracks.begin(), m_offStreamTracks.end());
+    m_mixer->setTracksToProcessWhenIdle(tracks);
 }
 
 // Sources

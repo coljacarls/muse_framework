@@ -195,7 +195,10 @@ private:
 
     // -----
     void onShouldProcessDuringSilenceChanged(const TrackId trackId, bool shouldProcess);
-    TrackId m_prevActiveTrackId = INVALID_TRACK_ID;
+    void updateTracksToProcessWhenIdle();
+    //! Tracks that received off-stream events since the last mode change: all of them must be processed while idle,
+    //! otherwise events sent to several tracks at once (e.g. a chord over several instruments) are not heard
+    std::unordered_set<TrackId> m_offStreamTracks;
     std::unordered_set<TrackId> m_tracksToProcessWhenIdle;
     // -----
 
